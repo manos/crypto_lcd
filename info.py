@@ -32,7 +32,6 @@ def btn_1_press_callback(channel):
     lcd.clear()
     print("Button pressed!")
     lcd.message(create_lcd_str([next(ITER), next(ITER)]))
-    signal.pause()
 
 def create_lcd_str(coins):
     """ Returns string like "BTC: 34,500\nETH: 1200" for first two currencies in [coins] """
