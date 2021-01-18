@@ -12,6 +12,7 @@ from time import sleep
 lcd = LCD()
 CURRENCIES = ["BTC", "ETH", "FARM", "GRAIN", "LINK", "MKR", "AAVE", "COMP"]
 ITER = cycle(CURRENCIES)
+CUR_ITER = []
 CMC_LISTINGS = {}
 CMC_PRO_KEY = os.getenv("CMC_KEY")
 
@@ -32,27 +33,39 @@ def btn_1_press_callback(channel):
     update_cmc_data()
     lcd.clear()
     print("Button pressed!")
-    lcd.message(create_lcd_str([next(ITER), next(ITER)]))
+    lcd.message(create_lcd_str(cycle_next()))
 
 def create_lcd_str(coins):
     """ Returns string like "BTC: 34,500\nETH: 1200" for first two currencies in [coins] """
     return f"{coins[0]}: {get_price(coins[0])}\n{coins[1]}: {get_price(coins[1])}"
 
+def cycle_next():
+    """ Returns two steps on the cycle [a,b], and records current value in CUR_ITER for re-use """
+    next1 = next(ITER)
+    next2 = next(ITER)
+    global CUR_ITER
+    CUR_ITER = [next1, next2]
+    return CUR_ITER
+
 def get_price(ticker):
-    """Returns current price (from coinmarketcap.com) for given symbol """
+    """ Returns current price (from coinmarketcap.com) for given symbol """
     res = [x["quote"]["USD"]["price"] for x in CMC_LISTINGS["data"] if x["symbol"] == ticker]
     if res:
-        return round(res[0], 2)
+        return round(res[0], 3)
     return 0
 
 @lru_cache(maxsize=None)
 def update_cmc_data():
-    print("Updating price data from coinmarkecap...")
+    print("Updating price data from coinmarketcap...")
     global CMC_LISTINGS
     CMC_LISTINGS = get_json("https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest")
 
 def clear_cmc_cache(sig, frame):
+    """ Fetch new prices, and update currently-displayed currencies """
     update_cmc_data.cache_clear()
+    update_cmc_data()
+    lcd.clear()
+    lcd.message(create_lcd_str(CUR_ITER))
     signal.alarm(60)
     signal.pause()
 
@@ -63,7 +76,7 @@ def main():
 
     update_cmc_data()
     lcd.clear()
-    lcd.message(create_lcd_str([next(ITER), next(ITER)]))
+    lcd.message(create_lcd_str(cycle_next()))
 
     signal.signal(signal.SIGALRM, clear_cmc_cache)
     signal.alarm(60)
