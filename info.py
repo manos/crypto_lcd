@@ -24,7 +24,7 @@ def get_json(url):
     return res.json()
 
 def signal_handler(sig, frame):
-    lcd.clear()
+    lcd.noDisplay()
     GPIO.cleanup()
     sys.exit(0)
 
