@@ -1,9 +1,9 @@
 ## Description
 
-Raspberry Pi code to display crypto prices on a 1602 LCD, with a momentary switch (button) to cycle through a list of currencies.
+Raspberry Pi code to display crypto prices on a 1602 LCD, with a momentary switch (button) to cycle through a list of currencies. Uses CoinGecko's free API for prices.
 
 ## Running
-Just run info.py, with a CMC_KEY env var set, with your coinmarketcap pro API key.
+Just run info.py. Edit CURRENCIES at the top of the file..
 
 ## Hardware
 * Raspberry Pi

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import logging as logger
 import os
 import requests
 import RPi.GPIO as GPIO
@@ -11,27 +12,28 @@ from time import sleep
 
 lcd = LCD()
 CURRENCIES = ["BTC", "ETH", "FARM", "GRAIN", "LINK", "MKR", "AAVE", "COMP"]
+# conflicting symbols on coingecko - specify which $id we really want (see cgo URL)
+CGO_ID_OVERRIDES = {"COMP": "compound-governance-token", "FARM": "harvest-finance"}
 ITER = cycle(CURRENCIES)
 CUR_ITER = []
-CMC_LISTINGS = {}
-CMC_PRO_KEY = os.getenv("CMC_KEY")
 CGO_URL = "https://api.coingecko.com/api/v3"
 CGO_COINS = []
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'WARNING').upper()
+logger.basicConfig(level=LOG_LEVEL)
 
 def get_json(url):
     """Fetches URL and returns JSON. """
-    headers = {"X-CMC_PRO_API_KEY": CMC_PRO_KEY}
-    res = requests.get(url, headers=headers)
+    res = requests.get(url)
     res.raise_for_status()
     return res.json()
 
-def signal_handler(sig, frame):
+def int_signal_handler(sig, frame):
+    lcd.clear()
     lcd.noDisplay()
     GPIO.cleanup()
     sys.exit(0)
 
 def btn_1_press_callback(channel):
-    update_cmc_data()
     lcd.clear()
     print("Button pressed!")
     lcd.message(create_lcd_str(cycle_next()))
@@ -59,33 +61,24 @@ def smart_round(val):
     return round(val, leading_zeroes + 3)
     
 def get_price(ticker):
-    """ Returns current price (from coinmarketcap.com) for given symbol, if listed there, otherwise uses coingecko """
-    res = [x["quote"]["USD"]["price"] for x in CMC_LISTINGS["data"] if x["symbol"] == ticker]
-    if res:
-        return smart_round(res[0])
-    else:
-        get_cgo_coins()
-        coin_id = [x["id"] for x in CGO_COINS if x["symbol"] == ticker.lower()][0]
-        res = get_json(CGO_URL + f"/simple/price?ids={coin_id}&vs_currencies=usd")[coin_id]["usd"]
-        return smart_round(res)
+    """ Returns current price (from coingecko.com) for given symbol """
+    get_cgo_coins()
+    coin_id = CGO_ID_OVERRIDES.get(ticker) or [x["id"] for x in CGO_COINS if x["symbol"] == ticker.lower()][0]
+    res = get_json(CGO_URL + f"/simple/price?ids={coin_id}&vs_currencies=usd")[coin_id]["usd"]
+    return smart_round(res)
 
 @lru_cache(maxsize=None)
 def get_cgo_coins():
     full_list = get_json(CGO_URL + "/coins/list")
     # trim to ones we care about
     global CGO_COINS
-    CGO_COINS = [x for x in full_list if x["symbol"] in [x.lower() for x in CURRENCIES]]
+    trimmed_list = CGO_COINS = [x for x in full_list if x["symbol"] in [x.lower() for x in CURRENCIES]]
+    logger.debug(f"CoinGecko coins list: {trimmed_list}")
 
-@lru_cache(maxsize=None)
-def update_cmc_data():
-    print("Updating price data from coinmarketcap...")
-    global CMC_LISTINGS
-    CMC_LISTINGS = get_json("https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest")
+def clear_cgo_cache():
+    get_cgo_coins.cache_clear()
 
-def clear_cmc_cache(sig, frame):
-    """ Fetch new prices, and update currently-displayed currencies """
-    update_cmc_data.cache_clear()
-    update_cmc_data()
+def update_display(sig, frame):
     lcd.clear()
     lcd.message(create_lcd_str(CUR_ITER))
     signal.alarm(60)
@@ -96,13 +89,12 @@ def main():
     GPIO.setup(btn_1, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.add_event_detect(btn_1, GPIO.FALLING, callback=btn_1_press_callback, bouncetime=100)
 
-    update_cmc_data()
     lcd.clear()
     lcd.message(create_lcd_str(cycle_next()))
 
-    signal.signal(signal.SIGALRM, clear_cmc_cache)
+    signal.signal(signal.SIGALRM, update_display)
     signal.alarm(60)
-    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGINT, int_signal_handler)
     signal.pause()
 
 if __name__ == '__main__':
