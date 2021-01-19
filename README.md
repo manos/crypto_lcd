@@ -14,6 +14,6 @@ Just run info.py. Edit CURRENCIES at the top of the file..
 ## About the code
 Care was taken to avoid busy loops. Everything is signal and event driven.
 
-A button press cycles through two currencies in the list at the top of the file. New prices are fetched every 60 seconds to avoid API limits, regardless how often you press the button.
+A button press cycles through two currencies in the list at the top of the file. New prices are fetched every 60 seconds to avoid API limits, regardless how often you press the button. Display updates every 60s and stays on the pair you previously stopped at.
 
 lcd.py comes from the sunfounder kits, and hard-codes GPIO pins that must be used to wire the LCD [instructions](http://wiki.sunfounder.cc/index.php?title=LCD1602_Module).

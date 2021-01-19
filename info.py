@@ -34,6 +34,7 @@ def int_signal_handler(sig, frame):
     sys.exit(0)
 
 def btn_1_press_callback(channel):
+    """ Button press cycles to next pair; cache cleared every 60s """
     lcd.clear()
     print("Button pressed!")
     lcd.message(create_lcd_str(cycle_next()))
@@ -61,6 +62,7 @@ def smart_round(val):
     leading_zeroes = len(exp) - len(exp.strip("0"))
     return round(val, leading_zeroes + 3)
     
+@lru_cache(maxsize=None)
 def get_price(ticker):
     """ Returns current price (from coingecko.com) for given symbol """
     get_cgo_coins()
@@ -81,6 +83,7 @@ def clear_cgo_cache():
 
 def wake_every_min(sig, frame):
     # updates display with new prices every iteration, and updates coin list daily
+    get_price.cache_clear()
     lcd.clear()
     lcd.message(create_lcd_str(CUR_ITER))
     global MINS
