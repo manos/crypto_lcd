@@ -16,10 +16,10 @@ CURRENCIES = ["BTC", "ETH", "FARM", "GRAIN", "LINK", "MKR", "AAVE", "COMP"]
 CGO_ID_OVERRIDES = {"COMP": "compound-governance-token", "FARM": "harvest-finance"}
 ITER = cycle(CURRENCIES)
 CUR_ITER = []
+MINS = 0
 CGO_URL = "https://api.coingecko.com/api/v3"
 CGO_COINS = []
-LOG_LEVEL = os.environ.get('LOG_LEVEL', 'WARNING').upper()
-logger.basicConfig(level=LOG_LEVEL)
+logger.basicConfig(level=os.environ.get('LOG_LEVEL', 'WARNING').upper())
 
 def get_json(url):
     """Fetches URL and returns JSON. """
@@ -52,6 +52,7 @@ def cycle_next():
 
 def smart_round(val):
     """ If we have a number > 0, give 3 decimals, otherwise, give 3 past leading zeroes """
+    logger.debug(f"rounding {val}")
     if "." not in str(val):
         return val
     num, exp = str(val).split(".")
@@ -78,9 +79,15 @@ def get_cgo_coins():
 def clear_cgo_cache():
     get_cgo_coins.cache_clear()
 
-def update_display(sig, frame):
+def wake_every_min(sig, frame):
+    # updates display with new prices every iteration, and updates coin list daily
     lcd.clear()
     lcd.message(create_lcd_str(CUR_ITER))
+    global MINS
+    MINS += 1
+    if MINS > 1440:
+        MINS = 0
+        clear_cgo_cache()
     signal.alarm(60)
     signal.pause()
 
@@ -94,7 +101,7 @@ def main():
     lcd.home()
     lcd.message(create_lcd_str(cycle_next()))
 
-    signal.signal(signal.SIGALRM, update_display)
+    signal.signal(signal.SIGALRM, wake_every_min)
     signal.alarm(60)
     signal.signal(signal.SIGINT, int_signal_handler)
     signal.pause()
