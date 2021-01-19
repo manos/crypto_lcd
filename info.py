@@ -89,7 +89,9 @@ def main():
     GPIO.setup(btn_1, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.add_event_detect(btn_1, GPIO.FALLING, callback=btn_1_press_callback, bouncetime=100)
 
+    lcd.display()
     lcd.clear()
+    lcd.home()
     lcd.message(create_lcd_str(cycle_next()))
 
     signal.signal(signal.SIGALRM, update_display)
