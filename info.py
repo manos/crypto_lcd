@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import logging as logger
 import os
 import requests
@@ -8,7 +9,10 @@ import sys
 from functools import lru_cache
 from itertools import cycle
 from lcd import LCD
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 from time import sleep
+from urllib3.exceptions import MaxRetryError
 
 lcd = LCD()
 CURRENCIES = ["BTC", "ETH", "FARM", "GRAIN", "LINK", "MKR", "AAVE", "COMP"]
@@ -23,9 +27,18 @@ logger.basicConfig(level=os.environ.get('LOG_LEVEL', 'WARNING').upper())
 
 def get_json(url):
     """Fetches URL and returns JSON. """
-    res = requests.get(url)
+    try:
+        retry = Retry(total=99, backoff_factor=0.1)
+        adapter = HTTPAdapter(max_retries=retry)
+        session = requests.Session()
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        res = session.request("GET", url, timeout=(3, 10))
+    except MaxRetryError as err:
+        logger.info(f"MaxRetries reached. Returning empty data. Error: {err}")
+        return {}
     res.raise_for_status()
-    return res.json()
+    return json.loads(res.content)
 
 def int_signal_handler(sig, frame):
     lcd.clear()
@@ -67,12 +80,15 @@ def get_price(ticker):
     """ Returns current price (from coingecko.com) for given symbol """
     get_cgo_coins()
     coin_id = CGO_ID_OVERRIDES.get(ticker) or [x["id"] for x in CGO_COINS if x["symbol"] == ticker.lower()][0]
-    res = get_json(CGO_URL + f"/simple/price?ids={coin_id}&vs_currencies=usd")[coin_id]["usd"]
+    res = get_json(CGO_URL + f"/simple/price?ids={coin_id}&vs_currencies=usd").get(coin_id, {}).get("usd", 0)
     return smart_round(res)
 
 @lru_cache(maxsize=None)
 def get_cgo_coins():
     full_list = get_json(CGO_URL + "/coins/list")
+    if not full_list:
+        logger.info(f"Error updating coingecko list of coin IDs. Resonse was: {full_list}")
+        return False
     # trim to ones we care about
     global CGO_COINS
     trimmed_list = CGO_COINS = [x for x in full_list if x["symbol"] in [x.lower() for x in CURRENCIES]]
