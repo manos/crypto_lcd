@@ -107,8 +107,6 @@ def wake_every_min(sig, frame):
     if MINS > 1440:
         MINS = 0
         clear_cgo_cache()
-    signal.alarm(60)
-    signal.pause()
 
 def main():
     btn_1 = 21
@@ -123,7 +121,12 @@ def main():
     signal.signal(signal.SIGALRM, wake_every_min)
     signal.alarm(60)
     signal.signal(signal.SIGINT, int_signal_handler)
-    signal.pause()
+    while True:
+        # Sleep and wait for a signal.
+        # The time doesn't matter here, as signals will interrupt the sleep call, and nothings that is non-signal
+        # driven needs to happen.
+        sleep(60)
+        signal.alarm(60)
 
 if __name__ == '__main__':
     main()
